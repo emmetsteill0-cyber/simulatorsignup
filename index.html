@@ -1,0 +1,216 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Weekend Simulator Schedule</title>
+<style>
+:root{color-scheme:dark;--bg:#151515;--panel:#252525;--line:#d2d2d2;--brown:#80491f;--green:#087900;--olive:#383900;--text:#f4f4f4;--muted:#c5c5c5;--blue:#2463eb}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:14px Arial,Helvetica,sans-serif}
+header{max-width:1180px;margin:auto;padding:22px 18px 12px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+h1{font-size:22px;margin:0 0 5px}p{margin:5px 0;color:var(--muted)}button,input,select,textarea{font:inherit;border-radius:4px;border:1px solid #777;padding:9px;background:#181818;color:white}button{cursor:pointer;background:#343434}button.primary{background:var(--blue);border-color:var(--blue)}button.danger{background:#7e2424}button:disabled{opacity:.45;cursor:not-allowed}
+main{max-width:1180px;margin:0 auto;padding:8px 18px 36px}.panel{background:var(--panel);border:1px solid #555;border-radius:5px;padding:16px;margin:12px 0}.hidden{display:none!important}
+.auth{max-width:440px;margin:45px auto}.auth form,.stack{display:grid;gap:10px}.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.row>*{flex:1}.row button{flex:0 0 auto}.toolbar{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}.status{padding:9px 11px;border-radius:4px;background:#303030;color:#eee;margin:10px 0}.status.error{background:#612525}.status.good{background:#164b20}
+.table-wrap{overflow:auto;border:1px solid var(--line)}table{border-collapse:collapse;width:100%;min-width:820px;table-layout:fixed;font-size:12px}th,td{border:1px solid var(--line);padding:6px;vertical-align:middle;overflow-wrap:anywhere}th{background:#333;text-align:left}td.date,td.day,td.time{background:var(--brown);font-weight:bold}td.shift{background:#292929}td.assign{background:#383900;vertical-align:top}td.open{background:var(--green)}td.notes{background:#292929}.person{display:flex;align-items:center;justify-content:space-between;gap:4px;padding:2px 3px;margin:1px 0;background:#855014;color:white;border-radius:2px}.person.mine{background:#276a9e}.slots{display:grid;gap:3px}.slot-empty{color:#d6d6d6;min-height:17px}.small{font-size:11px;color:#ddd}.tag{display:inline-block;padding:3px 6px;border-radius:3px;background:#3b3b3b;margin-right:4px}.signup{margin-top:6px;width:100%;font-size:12px;padding:6px}.section-title{margin:0 0 10px;font-size:16px}.admin-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px}.admin-grid label{display:grid;gap:5px;color:#ddd}.admin-grid textarea{min-height:65px;resize:vertical}.week-heading{background:#353535;padding:9px;margin:15px 0 0;border:1px solid #777;border-bottom:0;font-weight:bold}
+footer{max-width:1180px;margin:auto;padding:0 18px 24px;color:#999;font-size:12px}
+@media(max-width:650px){header{padding-top:16px}h1{font-size:19px}.panel{padding:10px}main{padding:5px 8px 25px}table{min-width:760px}}
+</style>
+</head>
+<body>
+<header>
+ <div><h1>Weekend Simulator Schedule</h1><p>Shared weekend shifts · Up to 4 people per shift</p></div>
+ <div class="row" style="flex:0 1 auto"><span id="who" class="small"></span><button id="logout" class="hidden">Log out</button></div>
+</header>
+<main>
+<section id="auth" class="panel auth">
+ <h2 class="section-title">Sign in</h2>
+ <p>Accounts are invitation-only. Ask an administrator for an invitation.</p>
+ <form id="loginForm" class="stack">
+  <label>Email<input id="email" type="email" autocomplete="username" required></label>
+  <label>Password<input id="password" type="password" autocomplete="current-password" required></label>
+  <button class="primary" type="submit">Sign in</button>
+ </form>
+ <div id="authMessage" class="status hidden"></div>
+</section>
+<section id="app" class="hidden">
+ <div id="message" class="status hidden" role="status"></div>
+ <div class="panel">
+  <div class="toolbar"><div><h2 class="section-title">Weekend schedule</h2><p>All signed-in members can see this schedule.</p></div>
+   <div class="row" style="flex:0 1 auto"><label class="small">Show from <input id="fromDate" type="date"></label><label class="small">Through <input id="toDate" type="date"></label><button id="refresh">Refresh</button></div>
+  </div>
+  <div id="schedule"></div>
+ </div>
+ <section id="adminPanel" class="panel hidden">
+  <h2 class="section-title">Administrator tools</h2>
+  <p>Create weekend shifts, choose the date and times, set a four-person maximum, and assign or remove members. The limit is enforced by the database.</p>
+  <h3>Set up the regular weekend schedule</h3>
+  <p>Quick-start option: create two standard shifts for every Saturday and Sunday in the selected date range. You can then edit times, add extra shifts/days, or delete entries below.</p>
+  <div class="row"><button id="generateWeekends" type="button">Generate weekend shifts for date range</button><span class="small">Creates Shift #1 (9:00 AM–11:30 AM) and Shift #2 (12:00 PM–5:00 PM) on each Saturday and Sunday. It skips dates that already have shifts.</span></div>
+  <hr style="border-color:#555;margin:20px 0">
+  <h3>Create a shift</h3>
+  <form id="shiftForm" class="admin-grid">
+   <label>Shift title<input name="title" required maxlength="80" placeholder="Shift #1"></label>
+   <label>Date<input name="shift_date" type="date" required></label>
+   <label>Start time<input name="start_time" type="time" required value="09:00"></label>
+   <label>End time<input name="end_time" type="time" required value="11:30"></label>
+   <label>Location / simulator<input name="location" maxlength="120" placeholder="Simulator room"></label>
+   <label>Notes<textarea name="notes" maxlength="1000" placeholder="Optional notes"></textarea></label>
+   <label>Maximum people<select name="capacity"><option value="4" selected>4 people (standard limit)</option></select></label>
+   <div style="align-self:end"><button class="primary" type="submit">Create shift</button></div>
+  </form>
+  <hr style="border-color:#555;margin:20px 0">
+  <h3>Invite a member</h3>
+  <p>Creates an email invitation. The recipient follows the Supabase invitation link to finish setting up their account.</p>
+  <form id="inviteForm" class="row">
+   <input name="invite_email" type="email" required placeholder="person@example.com">
+   <select name="invite_role"><option value="member">Member</option><option value="admin">Administrator</option></select>
+   <button class="primary" type="submit">Send invitation</button>
+  </form>
+  <p class="small">Only use the Administrator option for people you trust to manage the schedule.</p>
+  <hr style="border-color:#555;margin:20px 0">
+  <h3>Assign members to a shift</h3>
+  <form id="assignForm" class="admin-grid">
+   <label>Shift<select name="shift_id" id="assignShift" required></select></label>
+   <label>Member<select name="user_id" id="assignUser" required></select></label>
+   <div style="align-self:end"><button class="primary" type="submit">Assign member</button></div>
+  </form>
+  <h3 style="margin-top:22px">Manage existing shifts</h3>
+  <div id="adminShifts"></div>
+ </section>
+</section>
+</main>
+<footer>Private invite-only scheduler. Keep your Supabase service-role key secret; it must never be placed in this page.</footer>
+<script type="module">
+import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+
+/* Paste your Supabase project URL and anon/publishable key here. Never put a service-role key here. */
+const SUPABASE_URL = 'https://tnuelmkjtpxyzmqgoozj.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRudWVsbWtqdHB4eXptcWdvb3pqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE3MTU0OTIsImV4cCI6MjEwNzI5MTQ5Mn0.UgVxOk4TjiziHUiOunw5g_twAF2gFzR5p6sTx2C9c5I';
+const configured = SUPABASE_URL.startsWith('https://') && !SUPABASE_URL.includes('PASTE_') && !SUPABASE_ANON_KEY.includes('PASTE_');
+const $ = id => document.getElementById(id);
+let db, currentUser, profile, members = [], shifts = [], assignments = [];
+const esc = s => String(s ?? '').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function notify(text,error=false){const el=$('message');el.textContent=text;el.className='status'+(error?' error':'');el.classList.remove('hidden');}
+function hideNotify(){ $('message').classList.add('hidden'); }
+function localDate(d){const x=new Date(d);return `${x.getFullYear()}-${String(x.getMonth()+1).padStart(2,'0')}-${String(x.getDate()).padStart(2,'0')}`;}
+function nextSaturday(){let d=new Date();d.setHours(0,0,0,0);d.setDate(d.getDate()+((6-d.getDay()+7)%7));return localDate(d);}
+function addDays(iso,n){const d=new Date(iso+'T12:00:00');d.setDate(d.getDate()+n);return localDate(d);}
+function fmtDate(s){return new Date(s+'T12:00:00').toLocaleDateString(undefined,{month:'long',day:'numeric'});}
+function fmtTime(t){if(!t)return '';const [h,m]=t.slice(0,5).split(':').map(Number);return `${((h+11)%12)+1}:${String(m).padStart(2,'0')} ${h>=12?'PM':'AM'}`;}
+function range(s){return `${fmtTime(s.start_time)} – ${fmtTime(s.end_time)}`;}
+function setDefaults(){const from=nextSaturday();$('fromDate').value=from;$('toDate').value=addDays(from,90);}
+function authError(e){notify(e?.message||String(e),true);}
+async function init(){
+ if(!configured){$('authMessage').textContent='Setup required: open index.html and replace SUPABASE_URL and SUPABASE_ANON_KEY with your Supabase project values, then follow README.md.';$('authMessage').classList.remove('hidden');$('loginForm').querySelector('button').disabled=true;return;}
+ db=createClient(SUPABASE_URL,SUPABASE_ANON_KEY);
+ setDefaults();
+ const {data:{session}}=await db.auth.getSession();
+ if(session) await enterApp();
+ db.auth.onAuthStateChange(async(_event,session)=>{if(session&&!currentUser) await enterApp(); else if(!session) showAuth();});
+}
+function showAuth(){currentUser=null;profile=null;$('auth').classList.remove('hidden');$('app').classList.add('hidden');$('logout').classList.add('hidden');$('who').textContent='';}
+async function enterApp(){
+ const {data:{user}}=await db.auth.getUser();if(!user)return;currentUser=user;
+ const {data:p,error}=await db.from('profiles').select('id,email,display_name,role,active').eq('id',user.id).single();
+ if(error||!p||!p.active){await db.auth.signOut();$('authMessage').textContent='This account is not active. Contact an administrator.';$('authMessage').classList.remove('hidden');return;}
+ profile=p;$('auth').classList.add('hidden');$('app').classList.remove('hidden');$('logout').classList.remove('hidden');$('who').textContent=`${p.display_name||p.email} · ${p.role==='admin'?'Administrator':'Member'}`;
+ $('adminPanel').classList.toggle('hidden',p.role!=='admin');
+ await loadData();
+}
+async function loadData(){
+ hideNotify();
+ const from=$('fromDate').value||nextSaturday(),to=$('toDate').value||addDays(from,90);
+ const [sr,ar,mr]=await Promise.all([
+  db.from('shifts').select('*').gte('shift_date',from).lte('shift_date',to).order('shift_date').order('start_time'),
+  db.from('shift_assignments').select('shift_id,user_id,profiles(id,email,display_name)').order('created_at'),
+  profile.role==='admin'?db.from('profiles').select('id,email,display_name,role,active').eq('active',true).order('email'):Promise.resolve({data:[],error:null})
+ ]);
+ if(sr.error||ar.error||mr.error){authError(sr.error||ar.error||mr.error);return;}
+ shifts=sr.data||[];assignments=ar.data||[];members=mr.data||[];
+ renderSchedule();if(profile.role==='admin')renderAdmin();
+}
+function assigned(sid){return assignments.filter(a=>a.shift_id===sid);}
+function personName(a){return a.profiles?.display_name||a.profiles?.email||'Member';}
+function renderSchedule(){
+ const byDate=new Map();for(const s of shifts){if(!byDate.has(s.shift_date))byDate.set(s.shift_date,[]);byDate.get(s.shift_date).push(s);}
+ if(!shifts.length){$('schedule').innerHTML='<div class="status">No shifts in this date range yet. An administrator can create shifts below.</div>';return;}
+ let html='<div class="table-wrap"><table><thead><tr><th style="width:90px">Date</th><th style="width:75px">Day</th><th style="width:115px">Shift / Time</th><th>Assigned people (max 4)</th><th style="width:190px">Location / Notes</th></tr></thead><tbody>';
+ for(const [date,list] of byDate){
+  list.forEach((s,i)=>{
+   const people=assigned(s.id),mine=people.some(a=>a.user_id===currentUser.id),full=people.length>=4,weekend=['Saturday','Sunday'].includes(new Date(date+'T12:00:00').toLocaleDateString('en-US',{weekday:'long'}));
+   html+='<tr>';
+   if(i===0)html+=`<td class="date" rowspan="${list.length}">${esc(fmtDate(date))}</td><td class="day" rowspan="${list.length}">${esc(new Date(date+'T12:00:00').toLocaleDateString('en-US',{weekday:'long'}))}</td>`;
+   html+=`<td class="shift"><strong>${esc(s.title)}</strong><br>${esc(range(s))}</td><td class="assign"><div class="slots">`;
+   for(let n=0;n<4;n++){const a=people[n];html+=a?`<div class="person ${a.user_id===currentUser.id?'mine':''}"><span>${n+1}. ${esc(personName(a))}</span>${profile.role==='admin'?`<button data-unassign="${esc(s.id)}" data-user="${esc(a.user_id)}" title="Remove assignment" style="padding:1px 5px">×</button>`:''}</div>`:`<div class="slot-empty">${n+1}. — open —</div>`;}
+   html+='</div>';
+   if(!mine&&people.length<4)html+=`<button class="signup primary" data-signup="${esc(s.id)}">Sign myself up</button>`;
+   if(mine)html+='<span class="tag">You are signed up</span>';
+   if(full&&!mine)html+='<span class="tag">Full</span>';
+   html+=`</td><td class="notes">${esc(s.location||'')}${s.location&&s.notes?'<br>':''}${esc(s.notes||'')}</td></tr>`;
+  });
+ }
+ html+='</tbody></table></div>';$('schedule').innerHTML=html;
+ $('schedule').querySelectorAll('[data-signup]').forEach(b=>b.onclick=()=>signUp(b.dataset.signup));
+ $('schedule').querySelectorAll('[data-unassign]').forEach(b=>b.onclick=()=>unassign(b.dataset.unassign,b.dataset.user));
+}
+async function signUp(id){const {error}=await db.rpc('sign_up_for_shift',{p_shift_id:id});if(error)notify(error.message,true);else notify('You have been added to the shift.');await loadData();}
+async function unassign(shift_id,user_id){if(!confirm('Remove this person from the shift?'))return;const {error}=await db.from('shift_assignments').delete().eq('shift_id',shift_id).eq('user_id',user_id);if(error)notify(error.message,true);else notify('Assignment removed.');await loadData();}
+function renderAdmin(){
+ const options=shifts.map(s=>`<option value="${esc(s.id)}">${esc(fmtDate(s.shift_date))} · ${esc(s.title)} (${esc(range(s))})</option>`).join('');
+ $('assignShift').innerHTML=options||'<option value="">No shifts available</option>';
+ $('assignUser').innerHTML=members.map(m=>`<option value="${esc(m.id)}">${esc(m.display_name||m.email)}${m.role==='admin'?' (Admin)':''}</option>`).join('');
+ $('adminShifts').innerHTML=shifts.length?'<div class="table-wrap"><table><thead><tr><th>Date / shift</th><th>People</th><th>Actions</th></tr></thead><tbody>'+shifts.map(s=>`<tr><td>${esc(fmtDate(s.shift_date))}<br><strong>${esc(s.title)}</strong><br>${esc(range(s))}<br>${esc(s.location||'')}</td><td>${assigned(s.id).length}/4</td><td><button data-edit="${esc(s.id)}">Edit</button> <button class="danger" data-delete="${esc(s.id)}">Delete</button></td></tr>`).join('')+'</tbody></table></div>':'<p>No shifts created for this date range.</p>';
+ $('adminShifts').querySelectorAll('[data-delete]').forEach(b=>b.onclick=()=>deleteShift(b.dataset.delete));
+ $('adminShifts').querySelectorAll('[data-edit]').forEach(b=>b.onclick=()=>editShift(b.dataset.edit));
+}
+$('loginForm').addEventListener('submit',async e=>{e.preventDefault();const {error}=await db.auth.signInWithPassword({email:$('email').value.trim(),password:$('password').value});if(error){$('authMessage').textContent=error.message;$('authMessage').classList.remove('hidden');}});
+$('logout').onclick=async()=>{await db.auth.signOut();showAuth();};
+$('refresh').onclick=loadData;
+$('fromDate').onchange=loadData;$('toDate').onchange=loadData;
+$('generateWeekends').addEventListener('click',async()=>{
+ const from=$('fromDate').value,to=$('toDate').value;
+ if(!from||!to||to<from){notify('Choose a valid date range first.',true);return;}
+ if(!confirm(`Create standard shifts for every Saturday and Sunday from ${from} through ${to}? Existing dates with shifts will be skipped.`))return;
+ const existingDates=new Set(shifts.map(s=>s.shift_date));
+ const rows=[];
+ for(let d=from;d<=to;d=addDays(d,1)){
+  const day=new Date(d+'T12:00:00').getDay();
+  if((day===0||day===6)&&!existingDates.has(d)){
+   rows.push({title:'Shift #1',shift_date:d,start_time:'09:00',end_time:'11:30',location:'',notes:'',capacity:4});
+   rows.push({title:'Shift #2',shift_date:d,start_time:'12:00',end_time:'17:00',location:'',notes:'',capacity:4});
+  }
+ }
+ if(!rows.length){notify('No new weekend dates to add. Dates with existing shifts were skipped.');return;}
+ const {error}=await db.from('shifts').insert(rows);
+ if(error)notify(error.message,true);else notify(`Created ${rows.length} weekend shifts.`);
+ await loadData();
+});
+$('shiftForm').addEventListener('submit',async e=>{
+ e.preventDefault();const f=new FormData(e.currentTarget);const item=Object.fromEntries(f.entries());item.capacity=4;
+ if(item.end_time<=item.start_time){notify('End time must be later than start time.',true);return;}
+ const {error}=await db.from('shifts').insert(item);if(error)notify(error.message,true);else{notify('Shift created.');e.currentTarget.reset();e.currentTarget.elements.start_time.value='09:00';e.currentTarget.elements.end_time.value='11:30';$('fromDate').value=item.shift_date;$('toDate').value=addDays(item.shift_date,90);await loadData();}
+});
+$('assignForm').addEventListener('submit',async e=>{e.preventDefault();const f=new FormData(e.currentTarget);const {error}=await db.from('shift_assignments').insert({shift_id:f.get('shift_id'),user_id:f.get('user_id')});if(error)notify(error.message,true);else notify('Member assigned.');await loadData();});
+$('inviteForm').addEventListener('submit',async e=>{
+ e.preventDefault();const f=new FormData(e.currentTarget);
+ const {data:{session}}=await db.auth.getSession();
+ const {data,error}=await db.functions.invoke('admin-invite',{body:{email:f.get('invite_email'),role:f.get('invite_role')},headers:{Authorization:`Bearer ${session.access_token}`}});
+ if(error)notify(error.message,true);else if(data?.error)notify(data.error,true);else{notify('Invitation sent to '+f.get('invite_email'));e.currentTarget.reset();}
+});
+async function deleteShift(id){if(!confirm('Delete this shift and all of its assignments?'))return;const {error}=await db.from('shifts').delete().eq('id',id);if(error)notify(error.message,true);else notify('Shift deleted.');await loadData();}
+async function editShift(id){
+ const s=shifts.find(x=>x.id===id);if(!s)return;
+ const title=prompt('Shift title:',s.title);if(title===null)return;
+ const date=prompt('Date (YYYY-MM-DD):',s.shift_date);if(date===null)return;
+ const start=prompt('Start time (24-hour HH:MM):',s.start_time.slice(0,5));if(start===null)return;
+ const end=prompt('End time (24-hour HH:MM):',s.end_time.slice(0,5));if(end===null)return;
+ const location=prompt('Location / simulator:',s.location||'');if(location===null)return;
+ const notes=prompt('Notes:',s.notes||'');if(notes===null)return;
+ if(end<=start){notify('End time must be later than start time.',true);return;}
+ const {error}=await db.from('shifts').update({title,shift_date:date,start_time:start,end_time:end,location,notes}).eq('id',id);
+ if(error)notify(error.message,true);else notify('Shift updated.');await loadData();
+}
+init();
+</script>
+</body>
+</html>
