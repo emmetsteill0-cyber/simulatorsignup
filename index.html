@@ -84,8 +84,8 @@ footer{max-width:1180px;margin:auto;padding:0 18px 24px;color:#999;font-size:12p
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 
 /* Paste your Supabase project URL and anon/publishable key here. Never put a service-role key here. */
-const SUPABASE_URL = 'https://tnuelmkjtpxyzmqgoozj.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRudWVsbWtqdHB4eXptcWdvb3pqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE3MTU0OTIsImV4cCI6MjEwNzI5MTQ5Mn0.UgVxOk4TjiziHUiOunw5g_twAF2gFzR5p6sTx2C9c5I';
+const SUPABASE_URL = 'https://hwnbxufchkwsoskrhnyq.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh3bmJ4dWZjaGt3c29za3JobnlxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE3MjIzMDgsImV4cCI6MjEwNzI5ODMwOH0.q9vQbuTVojV4DweBiVmatzul_Bs6Bwh3t-XSANKyMAY';
 const configured = SUPABASE_URL.startsWith('https://') && !SUPABASE_URL.includes('PASTE_') && !SUPABASE_ANON_KEY.includes('PASTE_');
 const $ = id => document.getElementById(id);
 let db, currentUser, profile, members = [], shifts = [], assignments = [];
